@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Planificación de Procesos</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            padding: 20px;
+        }
+        #resultados {
+            margin-top: 20px;
+        }
+        #chart_div {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Simulador de Planificación de Procesos</h2>
+    
+    <form id="procesoForm">
+        <div class="form-group">
+            <label for="numeroProcesos">Número de procesos:</label>
+            <input type="number" class="form-control" id="numeroProcesos" placeholder="Ingrese el número de procesos">
+        </div>
+        <button type="button" class="btn btn-primary" onclick="crearFormulario()">Crear Formulario</button>
+    </form>
+
+    <div id="formularioProcesos"></div>
+
+    <button type="button" class="btn btn-success" onclick="calcularResultados('FCFS')">Calcular FCFS</button>
+    <button type="button" class="btn btn-success" onclick="calcularResultados('SPN')">Calcular SPN</button>
+
+    <div id="resultados" class="mt-4"></div>
+
+    <div id="chart_div"></div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+<script type="text/javascript">
+    google.charts.load('current', {'packages':['gantt']});
+    
+    function drawGanttChart(dataTable) {
+        var options = {
+            height: 400,
+            gantt: {
+                trackHeight: 30,
+                timeAxis: {
+                    format: 'y',
+                    gridColor: '#CCCCCC',
+                }
+            }
+        };
+
+        var chart = new google.visualization.Gantt(document.getElementById('chart_div'));
+        chart.draw(dataTable, options);
+    }
+</script>
+
+<script>
+    let numProcesos;
+    let procesos = [];
+
+    function crearFormulario() {
+        numProcesos = parseInt(document.getElementById("numeroProcesos").value);
+        procesos = [];
+
+        let formulario = '<form id="datosProcesosForm">';
+        for (let i = 0; i < numProcesos; i++) {
+            let nombre = String.fromCharCode(65 + i);  // A, B, C, ...
+            formulario += `
+                    <div class="marg input-group mb-3">
+                    <input type="number" class="form-control" id="llegada_${nombre}" placeholder="Ingrese el tiempo de llegada para ${nombre}">
+                    <input type="number" class="form-control" id="ejecucion_${nombre}" placeholder="Ingrese el tiempo de ejecución para ${nombre}">
+                    </div>
+            `;
+            procesos.push({ nombre: nombre, llegada: 0, ejecucion: 0 });
+        }
+        formulario += '</form>';
+
+        document.getElementById("formularioProcesos").innerHTML = formulario;
+    }
+
+    function calcularResultados(politica) {
+        for (let i = 0; i < numProcesos; i++) {
+            let nombre = String.fromCharCode(65 + i);
+            procesos[i].llegada = parseInt(document.getElementById(`llegada_${nombre}`).value);
+            procesos[i].ejecucion = parseInt(document.getElementById(`ejecucion_${nombre}`).value);
+        }
+
+        let resultados = '<h3>Resultados:</h3>';
+        resultados += '<table class="table table-bordered">';
+        resultados += '<thead><tr><th>Proceso</th><th>T. Llegada</th><th>T. Ejecucion</th><th>T. Retorno</th><th>T. Espera</th></tr></thead>';
+        resultados += '<tbody>';
+
+        let tiempoActual = 0;
+        let procesosRestantes = [...procesos];
+
+        while (procesosRestantes.length > 0) {
+            let procesoActual;
+            if (politica === "FCFS") {
+                procesoActual = procesosRestantes.shift();
+            } else if (politica === "SPN") {
+                procesosRestantes.sort((a, b) => a.ejecucion - b.ejecucion);
+                procesoActual = procesosRestantes.shift();
+            }
+
+            procesoActual.inicio = Math.max(tiempoActual, procesoActual.llegada);
+            procesoActual.finalizacion = procesoActual.inicio + procesoActual.ejecucion;
+            procesoActual.retorno = procesoActual.finalizacion - procesoActual.llegada;
+            procesoActual.espera = procesoActual.inicio - procesoActual.llegada;
+            tiempoActual = procesoActual.finalizacion;
+
+            resultados += `<tr><td>${procesoActual.nombre}</td><td>${procesoActual.llegada}</td><td>${procesoActual.ejecucion}</td><td>${procesoActual.retorno}</td><td>${procesoActual.espera}</td></tr>`;
+        }
+
+        resultados += '</tbody></table>';
+
+        let totalRetorno = procesos.reduce((total, proceso) => total + proceso.retorno, 0);
+        let totalEspera = procesos.reduce((total, proceso) => total + proceso.espera, 0);
+        let promedioRetorno = totalRetorno / numProcesos;
+        let promedioEspera = totalEspera / numProcesos;
+
+        resultados += `<p>Promedio de Tiempo de Retorno: ${promedioRetorno.toFixed(2)}</p>`;
+        resultados += `<p>Promedio de Tiempo de Espera: ${promedioEspera.toFixed(2)}</p>`;
+
+        document.getElementById("resultados").innerHTML = resultados;
+
+        let data = new google.visualization.DataTable();
+        data.addColumn('string', 'Task ID');
+        data.addColumn('string', 'Task Name');
+        data.addColumn('string', 'Resource');
+        data.addColumn('date', 'Start Date');
+        data.addColumn('date', 'End Date');
+        data.addColumn('number', 'Duration');
+        data.addColumn('number', 'Percent Complete');
+        data.addColumn('string', 'Dependencies');
+
+        procesos.forEach(proceso => {
+            let percentComplete = 100 * (proceso.retorno / proceso.ejecucion);
+            data.addRow([proceso.nombre, proceso.nombre, 'departamento', new Date(0, 0, 0, 0, proceso.inicio), new Date(0, 0, 0, 0, proceso.finalizacion), null, percentComplete, null]);
+        });
+
+        drawGanttChart(data);
+    }
+</script>
+
+</body>
+</html>
